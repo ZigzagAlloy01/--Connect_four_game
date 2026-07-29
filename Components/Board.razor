@@ -1,0 +1,140 @@
+@inject GameState State
+@using System.Drawing
+
+<div style="--board-bg: @ColorTranslator.ToHtml(BoardColor); --player1: @player1Color; --player2: @player2Color;">
+
+    <h3>Board</h3>
+
+    <section class="game-dashboard" aria-label="Game Dashboard">
+        <div class="score-colors">
+            <div>
+                <label for="p1color">Player 1 Color & Wins:</label>
+                <input type="color" id="p1color" @bind="player1Color" @bind:event="oninput"/>
+                <span class="fw-bold ms-2">@player1Wins</span>
+            </div>
+            <div>
+                <label for="p2color">Player 2 Color & Wins:</label>
+                <input type="color" id="p2color" @bind="player2Color" @bind:event="oninput"/>
+                <span class="fw-bold ms-2">@player2Wins</span>
+            </div>
+        </div>
+    </section>
+
+    <article aria-live="polite">
+        @winnerMessage  <button style="@ResetStyle" class="reset-btn" @onclick="ResetGame">Reset the game</button>
+        <br />
+        <span class="alert-danger" role="alert">@errorMessage</span>
+        <span class="alert-info">@CurrentTurn</span>
+    </article>
+
+    <nav aria-label="Game Board Controls">
+        @for (byte i = 0; i < 7; i++)
+        {
+            var col = i;
+            <button type="button" 
+                    class="column-btn" 
+                    title="Drop piece in column @(col + 1)" 
+                    aria-label="Drop piece in column @(col + 1)" 
+                    @onclick="() => PlayPiece(col)">🔽</button>
+        }
+    </nav>
+
+    <div class="game-area">
+        
+
+        <div>
+            <div class="board" aria-hidden="true">
+            @for (var i = 0; i < 42; i++)
+            {
+                <span class="container">
+                    <span></span>
+                </span>
+            }
+            </div>
+            @for (var i = 0; i < 42; i++)
+            {
+            <span class="@pieces[i]"></span>
+            }
+        </div>
+        
+        <aside class="move-history" aria-label="Move History">
+            <h4>Move History</h4>
+            <ul>
+                @foreach (var move in moveHistory)
+                {
+                    <li>@move</li>
+                }
+            </ul>
+        </aside>
+    </div>
+</div>
+
+@code {
+    private string[] pieces = new string[42];
+    private string winnerMessage = string.Empty;
+    private string errorMessage = string.Empty;
+    
+    private string player1Color = "#ff0000"; 
+    private string player2Color = "#0000ff"; 
+
+    private int player1Wins = 0;
+    private int player2Wins = 0;
+    private bool gameEnded = false;
+
+    private List<string> moveHistory = new();
+
+    private string CurrentTurn => (winnerMessage == string.Empty) ? $"Player {State.PlayerTurn}'s Turn" : "";
+    private string ResetStyle => (winnerMessage == string.Empty) ? "display: none;" : "";
+
+    private void PlayPiece(byte col)
+    {
+        if (gameEnded) return;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var player = State.PlayerTurn;
+            var turn = State.CurrentTurn;
+            var landingRow = State.PlayPiece(col);
+            pieces[turn] = $"player{player} col{col} drop{landingRow}";
+            moveHistory.Add($"Player {player} dropped a piece in column {col + 1}");
+
+            var winState = State.CheckForWin();
+            if (winState == GameState.WinState.Player1_Wins) {
+                winnerMessage = "Player 1 Wins!";
+                player1Wins++;
+                gameEnded = true;
+            } else if (winState == GameState.WinState.Player2_Wins) {
+                winnerMessage = "Player 2 Wins!";
+                player2Wins++;
+                gameEnded = true;
+            } else if (winState == GameState.WinState.Tie) {
+                winnerMessage = "It's a tie!";
+                gameEnded = true;
+            }
+
+        }
+        catch (ArgumentException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void ResetGame()
+    {
+        State.ResetBoard();
+        winnerMessage = string.Empty;
+        errorMessage = string.Empty;
+        pieces = new string[42];
+        moveHistory.Clear();
+        gameEnded = false;
+    }
+
+    [Parameter]
+    public Color BoardColor { get; set; } = System.Drawing.Color.Black;
+
+    protected override void OnInitialized()
+    {
+        State.ResetBoard();
+    }
+}
